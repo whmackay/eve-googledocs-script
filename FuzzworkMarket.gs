@@ -59,9 +59,10 @@ function updatePrices(){
   for (o=0,j=TypeIds.length; o < j; o+=chunk) {
     //Slice array into row blocks(chunks) of 100 and extract just the typeIds.
     types = TypeIds.slice(o,o+chunk).map((value,index) => { return value[0]; }).join(",").replace(/,$/,'');
-    Utilities.sleep(100);
     jsonSellFeed = UrlFetchApp.fetch(sellUrl+types, parameters).getContentText();
+    Utilities.sleep(200);
     jsonBuyFeed = UrlFetchApp.fetch(buyUrl+types, parameters).getContentText();
+    Utilities.sleep(200);
     jsonSell = JSON.parse(jsonSellFeed);
     jsonBuy = JSON.parse(jsonBuyFeed);
 
