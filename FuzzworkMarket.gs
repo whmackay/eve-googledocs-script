@@ -1,59 +1,84 @@
-// Requires a list of typeids, so something like Types!A:A
-// https://docs.google.com/spreadsheets/d/1IixV0eNqg19FE6cLzb83G1Ucb0Otl-Jnvm6csAlPKwo/edit?usp=sharing for an example
+// This code depends on having three sheets. One called prices, one called typeids, one called systemids
+// Do not store _anything_ you care about on prices, as it will be wiped each time the function runs.
+// typeids has a two columns with EVE database typeID and typeName, systemids has EVE database systemsId and
+// systemsName along with two macro columns for product market and material market.
 
-function loadRegionAggregates(priceIDs,regionID){
-  if (typeof regionID == 'undefined'){
-    regionID=10000002;
-  }
-  if (typeof priceIDs == 'undefined'){
-    throw 'Need a list of typeids';
-  }
+// This adds a new menu to the sheet, with a single entry to update prices.
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('API')
+      .addItem('Update Prices', 'updatePrices')
+      .addToUi();
+}
+
+function updatePrices(){
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var resultsheet=ss.getSheetByName("prices");
+  var typessheet=ss.getSheetByName("typeids");
+  var systemSheet=ss.getSheetByName("systemids");
+
+  //Get buy and sell solar system ids for target product market to sale merchanise and target market to buy materials.
+  var sellSystemId = systemSheet.getRange("B1:B2").getValues()[0,1];
+  Logger.log("Sell System : " + sellSystemId);
+  var buySystemId = systemSheet.getRange("D1:D2").getValues()[0,1];
+  Logger.log("Buy System : " + buySystemId);
+
+  //clear out the old prices
+  resultsheet.clear();
 
   var prices = new Array();
-  var dirtyTypeIds = new Array();
-  var cleanTypeIds = new Array();
-  var url="https://market.fuzzwork.co.uk/aggregates/?region="+regionID+"&types="
-  
-  priceIDs.forEach (function (row) {
-    row.forEach ( function (cell) {
-     if (typeof(cell) === 'number' ) {
-        dirtyTypeIds.push(cell);
-      }
-    });
-  });
-  cleanTypeIds = dirtyTypeIds.filter(function(v,i,a) {
+  var TypeIds = new Array();
+  var sellUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+sellSystemId+'&typeid=';
+  Logger.log("EVEMarketer Sell URI : " + sellUrl);
+  var buyUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+buySystemId+'&typeid=';
+  Logger.log("EVEMarketer Buy URI : " + buyUrl);
+
+  // fill in all the typeids to lookup with typeNames.
+  var len = typessheet.getLastRow();
+  for(var i = 2 ; i < len +1  ; i++){
+    var typeid = typessheet.getRange("A"+i).getValue();
+    var typeName = typessheet.getRange("B"+i).getValue();
+    if ((typeof(typeid) === 'number') && (typeof(typeName) === 'string')) {
+        TypeIds.push([typeid,typeName]);
+    }
+  }
+
+  // Deduplicate the list
+  TypeIds = TypeIds.filter(function(v,i,a) {
     return a.indexOf(v)===i;
   });
-  prices.push(['TypeID','Buy volume','Buy Weighted Average','Max Buy','Min Buy','Buy Std Dev','Median Buy','Percentile Buy Price','Sell volume','Sell Weighted Average','Max sell','Min Sell','Sell Std Dev','Median Sell','Percentile Sell Price'])
+
+  // add a header row
+  resultsheet.appendRow(['TypeID','TypeName','minSell', 'maxBuy', 'volume', 'sellSystem', 'buySystem']);
   var parameters = {method : "get", payload : ""};
-  
-  var o,j,temparray,chunk = 100;
-  for (o=0,j=cleanTypeIds.length; o < j; o+=chunk) {
-    temparray = cleanTypeIds.slice(o,o+chunk);
+
+
+  // go through the typeids, 100 at a time.
+  var types, typeName, jsonSellFeed, jsonSell, jsonBuyFeed, jsonBuy, o,j,chunk = 100;
+  for (o=0,j=TypeIds.length; o < j; o+=chunk) {
+    //Slice array into row blocks(chunks) of 100 and extract just the typeIds.
+    types = TypeIds.slice(o,o+chunk).map((value,index) => { return value[0]; }).join(",").replace(/,$/,'');
     Utilities.sleep(100);
-    var types=temparray.join(",").replace(/,$/,'')
-    var jsonFeed = UrlFetchApp.fetch(url+types, parameters).getContentText();
-    var json = JSON.parse(jsonFeed);
-    if(json) {
-      for(i in json) {
-        var price=[parseInt(i),
-                   parseInt(json[i].buy.volume),
-                   parseInt(json[i].buy.weightedAverage),
-                   parseFloat(json[i].buy.max),
-                   parseFloat(json[i].buy.min),
-                   parseFloat(json[i].buy.stddev),
-                   parseFloat(json[i].buy.median),
-                   parseFloat(json[i].buy.percentile),
-                   parseInt(json[i].sell.volume),
-                   parseFloat(json[i].sell.weightedAverage),
-                   parseFloat(json[i].sell.max),
-                   parseFloat(json[i].sell.min),
-                   parseFloat(json[i].sell.stddev),
-                   parseFloat(json[i].sell.median),
-                   parseFloat(json[i].sell.percentile)];
-        prices.push(price);
+    jsonSellFeed = UrlFetchApp.fetch(sellUrl+types, parameters).getContentText();
+    jsonBuyFeed = UrlFetchApp.fetch(buyUrl+types, parameters).getContentText();
+    jsonSell = JSON.parse(jsonSellFeed);
+    jsonBuy = JSON.parse(jsonBuyFeed);
+
+    if(jsonSell) {
+      for(indexSell in jsonSell) {
+        for(indexBuy in jsonBuy) {
+          if(parseInt(jsonBuy[indexBuy].buy.forQuery.types) == parseInt(jsonSell[indexSell].sell.forQuery.types)){
+            typeName = TypeIds.find((element) => element[0] == parseInt(jsonSell[indexSell].sell.forQuery.types))[1];
+            resultsheet.appendRow([parseInt(jsonSell[indexSell].sell.forQuery.types),
+              typeName,
+              parseFloat(jsonSell[indexSell].sell.min),
+              parseFloat(jsonBuy[indexBuy].buy.max),
+              parseInt(jsonSell[indexSell].sell.volume)
+            ])
+          }
+        }
       }
     }
   }
-  return prices;
 }
