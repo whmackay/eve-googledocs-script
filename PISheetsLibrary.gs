@@ -84,3 +84,57 @@ function updateMarketPricesSheet() {
 
     return 0;
 }
+
+function updateIndustryCostsSheet() {
+    let ss = SpreadsheetApp.getActiveSpreadsheet();
+    let typesSheet=ss.getSheetByName("marketTypeIds");
+    let solarSystemList = ['Kakki' , 'Amarr'];
+    let typesJobBaseCosts = [];
+    let industryIndices = [];
+    let typesIndustryJobCosts = {};
+
+    //Get typeIds and typeNames for use in retrieving industrial base costs.
+    Logger.log('Getting typeIds and typeNames from ' + typesSheet.getName());
+    let types = typesSheet.getRange("A2:B" + typesSheet.getLastRow()).getValues();
+
+    //Using typeIds and typeNames invoke routine to retrieve base cost.
+    if (types.length > 0){
+        Logger.log('Invoking routine to get job costs per typeId-typeName pair.');
+        typesJobBaseCosts = getTypesJobBaseCost(types);
+    }
+
+    // Get Industry Indices per system.
+    if (typesJobBaseCosts.length > 0) {
+        solarSystemList.forEach( element => {
+            industryIndices.push([element, getIndustryIndices(element)]);
+        });
+    }
+
+    if ((typesJobBaseCosts.length > 0) && (industryIndices.length > 0)) {
+        for (let i = 0; i < typesJobBaseCosts.length; i++) {
+            typesIndustryJobCosts[typesJobBaseCosts[i][0]] = {
+                'typeId' : typesJobBaseCosts[i][0],
+                'typeName' : typesJobBaseCosts[i][1],
+                'bluePrintTypeId' : typesJobBaseCosts[i][3],
+                'baseCost' : typesJobBaseCosts[i][2]
+            };
+            for (let ii = 0; ii < industryIndices.length; ii++) {
+                typesIndustryJobCosts[typesJobBaseCosts[i][0]]['solarSystem' + ii] = (() => {
+                    let tempObject = {};
+                    tempObject.solarSystemName = industryIndices[ii][0];
+                    for (let iii = 0; iii < industryIndices[ii][1].length; iii++) {
+                        if ((industryIndices[ii][1][iii][0] === 'Copying') || (industryIndices[ii][1][iii][0] === 'Invention') || (industryIndices[ii][1][iii][0] === 'Researching Time Efficiency') || (industryIndices[ii][1][iii][0] === 'Researching Material Efficiency')){
+                            tempObject[industryIndices[ii][1][iii][0]] = industryIndices[ii][1][iii][1]*typesJobBaseCosts[i][2]*0.02;
+                        }
+                        else{
+                            tempObject[industryIndices[ii][1][iii][0]] = industryIndices[ii][1][iii][1]*typesJobBaseCosts[i][2];
+                        }
+                    }
+                    return tempObject;
+                })();
+            }
+        }
+    }
+
+    return 0;
+}
