@@ -1,6 +1,6 @@
 function getSolarySystemIndustryIndices(systemName) {
     let uri = 'https://api.eve-industry.org/system-cost-index.xml?name=';
-    let industryIndices = new Array();
+    let industryIndices = [];
     const parameters = {method : "get", payload : ""};
 
     if (typeof systemName == 'string') {
@@ -44,7 +44,7 @@ function getSolarySystemIndustryIndices(systemName) {
 
 
 function getIndustryIndices(systemName){
-    let industryIndices = new Array();
+    let industryIndices = [];
 
     Logger.log('Getting industry indices for solar system : ' + systemName);
     industryIndices = getSolarySystemIndustryIndices(systemName);
@@ -66,7 +66,6 @@ function getTypesJobBaseCost(types){
     const parameters = {method : "get", payload : ""};
     const baseURI = 'https://api.eve-industry.org/job-base-cost.xml?names=';
     let typesJobBaseCosts = [];
-    let typeNames, typeIds;
 
     //types = [[34, 'Tritanium'], [11553, 'Oscillator Capacitor Unit']];
 
@@ -116,9 +115,6 @@ function getTypesJobBaseCost(types){
                     typesJobBaseCosts[i][0] = types[ii][0];
                     typesJobBaseCosts[i][1] = types[ii][1];
                     ii = types.length;
-                    if (types[i][1] == 'Megacyte'){
-                        let iValue = 1;
-                    }
                 }
             }
         }
@@ -133,7 +129,7 @@ function getTypesJobBaseCost(types){
 // Function accepts two systemIds and an array of typeIds and returns an array of prices.
 function getMarketPrices(sellSystemId, buySystemId, typeIds){
 
-    let prices = new Array();
+    let prices = [];
     let sellUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+sellSystemId+'&typeid=';
     Logger.log("EVEMarketer Sell URI : " + sellUrl);
     let buyUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+buySystemId+'&typeid=';
@@ -142,10 +138,10 @@ function getMarketPrices(sellSystemId, buySystemId, typeIds){
 
 
     // go through the typeids, 100 at a time.
-    var types, typeName, jsonSellFeed, jsonSell, jsonBuyFeed, jsonBuy, o,j,chunk = 100;
+    let types, typeName, jsonSellFeed, jsonSell, jsonBuyFeed, jsonBuy, o,j,chunk = 100;
     for (o=0,j=typeIds.length; o < j; o+=chunk) {
         //Slice array into row blocks(chunks) of 100 and extract just the typeIds.
-        types = typeIds.slice(o,o+chunk).map((value,index) => { return value[0]; }).join(",").replace(/,$/,'');
+        types = typeIds.slice(o,o+chunk).map((value) => { return value[0]; }).join(",").replace(/,$/,'');
         jsonSellFeed = UrlFetchApp.fetch(sellUrl+types, parameters).getContentText();
         Utilities.sleep(200);
         jsonBuyFeed = UrlFetchApp.fetch(buyUrl+types, parameters).getContentText();
