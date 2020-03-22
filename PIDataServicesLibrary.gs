@@ -59,3 +59,53 @@ function getIndustryIndices(systemName){
     return (industryIndices.length > 0) ? industryIndices : 1;
 }
 
+
+
+
+// This code depends on having three sheets. One called prices, one called typeids, one called systemids
+// Do not store _anything_ you care about on prices, as it will be wiped each time the function runs.
+// typeids has a two columns with EVE database typeID and typeName, systemids has EVE database systemsId and
+// systemsName along with two macro columns for product market and material market.
+function getMarketPrices(sellSystemId, buySystemId, typeIds, targetSheet){
+
+    let prices = new Array();
+    let sellUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+sellSystemId+'&typeid=';
+    Logger.log("EVEMarketer Sell URI : " + sellUrl);
+    let buyUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+buySystemId+'&typeid=';
+    Logger.log("EVEMarketer Buy URI : " + buyUrl);
+    let parameters = {method : "get", payload : ""};
+
+
+    // go through the typeids, 100 at a time.
+    var types, typeName, jsonSellFeed, jsonSell, jsonBuyFeed, jsonBuy, o,j,chunk = 100;
+    for (o=0,j=typeIds.length; o < j; o+=chunk) {
+        //Slice array into row blocks(chunks) of 100 and extract just the typeIds.
+        types = typeIds.slice(o,o+chunk).map((value,index) => { return value[0]; }).join(",").replace(/,$/,'');
+        jsonSellFeed = UrlFetchApp.fetch(sellUrl+types, parameters).getContentText();
+        Utilities.sleep(200);
+        jsonBuyFeed = UrlFetchApp.fetch(buyUrl+types, parameters).getContentText();
+        Utilities.sleep(200);
+        jsonSell = JSON.parse(jsonSellFeed);
+        jsonBuy = JSON.parse(jsonBuyFeed);
+
+        if(jsonSell) {
+            for(indexSell in jsonSell) {
+                for(indexBuy in jsonBuy) {
+                    if(parseInt(jsonBuy[indexBuy].buy.forQuery.types) == parseInt(jsonSell[indexSell].sell.forQuery.types)){
+                        typeName = typeIds.find((element) => element[0] == parseInt(jsonSell[indexSell].sell.forQuery.types))[1];
+                        prices.push([
+                            parseInt(jsonSell[indexSell].sell.forQuery.types),
+                            typeName,
+                            parseFloat(jsonSell[indexSell].sell.min),
+                            parseFloat(jsonBuy[indexBuy].buy.max),
+                            parseInt(jsonSell[indexSell].sell.volume)
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    return (prices.length > 0) ? prices : 1;
+}
+
