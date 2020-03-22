@@ -62,11 +62,10 @@ function getIndustryIndices(systemName){
 
 
 
-// This code depends on having three sheets. One called prices, one called typeids, one called systemids
-// Do not store _anything_ you care about on prices, as it will be wiped each time the function runs.
-// typeids has a two columns with EVE database typeID and typeName, systemids has EVE database systemsId and
-// systemsName along with two macro columns for product market and material market.
-function getMarketPrices(sellSystemId, buySystemId, typeIds, targetSheet){
+// This function uses api.evemarketer.com to pull prices for typeId from both a source/purchase and product/sales solar system using systemId. The purpose
+// is to allow the user to see the price delta between the max buy order in the purchase system to the minimum sell order in the product/sales system.
+// Function accepts two systemIds and an array of typeIds and returns an array of prices.
+function getMarketPrices(sellSystemId, buySystemId, typeIds){
 
     let prices = new Array();
     let sellUrl='https://api.evemarketer.com/ec/marketstat/json?usesystem='+sellSystemId+'&typeid=';
